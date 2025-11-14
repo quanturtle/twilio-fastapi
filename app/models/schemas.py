@@ -1,17 +1,6 @@
 from pydantic import BaseModel
 
 
-class ChatInput(BaseModel):
-    recipient: str
-    message: str
-
-
-class ChatResponse(BaseModel):
-    recipient: str
-    sender: str
-    message: str
-
-
 class MessageHistory(BaseModel):
     id: int
     recipient: str

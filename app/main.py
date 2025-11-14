@@ -1,17 +1,24 @@
 import os
-from typing import List
-from fastapi import FastAPI, Depends, HTTPException
+import logging
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Form
 from twilio.rest import Client
 from openai import OpenAI
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-from app.models.schemas import ChatInput, ChatResponse, MessageHistory
+from app.models.schemas import ChatResponse, MessageHistory
 from app.models.database import Message, MessageDirection
 from app.database import get_db, init_db
-
+from app.database import SessionLocal
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Initialize FastAPI app
 app = FastAPI(title="Twilio FastAPI ChatGPT WhatsApp Bot")
@@ -69,44 +76,84 @@ def save_message(
     return db_message
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(input: ChatInput, db: Session = Depends(get_db)):
+def process_and_respond(recipient: str, message: str, whatsapp_number: str):
+    """
+    Background task to process message with ChatGPT and send response.
+    This runs asynchronously after the webhook returns.
+    """
+    try:
+        # Get ChatGPT response
+        reply_message = get_chatgpt_reply(message)
+        
+        # Send response via WhatsApp
+        send_whatsapp_message(recipient, reply_message)
+        
+        # Log outgoing message
+        logging.info(f"Outgoing - recipient={recipient}, sender={whatsapp_number}, message={reply_message}")
+        
+        # Save outgoing message to database
+        # Create a new database session for the background task
+        db = SessionLocal()
+        try:
+            save_message(
+                db=db,
+                recipient=recipient,
+                sender=whatsapp_number,
+                message_text=reply_message,
+                direction=MessageDirection.outgoing
+            )
+
+        finally:
+            db.close()
+            
+    except Exception as e:
+        # Log the error but don't crash the background task
+        print(f"Error processing message: {str(e)}")
+
+
+@app.post("/chat")
+async def chat(
+    background_tasks: BackgroundTasks,
+    From: str = Form(...),
+    Body: str = Form(...),
+    To: str | None = Form(None),
+    MessageSid: str | None = Form(None),
+    db: Session = Depends(get_db)
+):
     """
     Twilio webhook endpoint that receives WhatsApp messages,
     processes them with ChatGPT, and sends responses back.
+    Returns immediately while processing happens in the background.
     """
+    # Strip "whatsapp:" prefix from phone numbers
+    sender_number = From.replace("whatsapp:", "")
+    recipient_number = To.replace("whatsapp:", "") if To else whatsapp_number
+    
     # Save incoming message to database
     save_message(
         db=db,
-        recipient=whatsapp_number,
-        sender=input.recipient,
-        message_text=input.message,
+        recipient=recipient_number,
+        sender=sender_number,
+        message_text=Body,
         direction=MessageDirection.incoming
     )
     
-    # Get ChatGPT response
-    reply_message = get_chatgpt_reply(input.message)
+    # Log incoming message
+    logging.info(f"Incoming - recipient={recipient_number}, sender={sender_number}, message={Body}")
     
-    # Send response via WhatsApp
-    send_whatsapp_message(input.recipient, reply_message)
-    
-    # Save outgoing message to database
-    save_message(
-        db=db,
-        recipient=input.recipient,
-        sender=whatsapp_number,
-        message_text=reply_message,
-        direction=MessageDirection.outgoing
+    # Add background task to process and respond
+    background_tasks.add_task(
+        process_and_respond,
+        recipient=sender_number,
+        message=Body,
+        whatsapp_number=whatsapp_number
     )
     
-    return ChatResponse(
-        recipient=input.recipient,
-        sender=whatsapp_number,
-        message=reply_message
-    )
+    # Return immediate acknowledgment
+    return {"status": "received", "message": "Message received and being processed"}
 
 
-@app.get("/history/{recipient}", response_model=List[MessageHistory])
+@app.get("/history/{recipient}", response_model=list[MessageHistory])
 async def get_history(recipient: str, limit: int = 50, db: Session = Depends(get_db)):
     """
     Retrieve conversation history for a specific recipient.
