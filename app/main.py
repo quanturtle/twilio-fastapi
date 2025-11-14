@@ -6,24 +6,26 @@ from openai import OpenAI
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-from app.models.schemas import ChatResponse, MessageHistory
+from app.models.schemas import MessageHistory
 from app.models.database import Message, MessageDirection
 from app.database import get_db, init_db
 from app.database import SessionLocal
-# Load environment variables
+
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(levelname)s:     %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Initialize FastAPI app
+logging.getLogger('openai').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('twilio').setLevel(logging.WARNING)
+
 app = FastAPI(title="Twilio FastAPI ChatGPT WhatsApp Bot")
 
-# Initialize clients
 twilio_client = Client(
     os.getenv("TWILIO_ACCOUNT_SID"),
     os.getenv("TWILIO_AUTH_TOKEN")
@@ -42,7 +44,10 @@ def get_chatgpt_reply(message: str) -> str:
     """Get a reply from ChatGPT for the given message."""
     response = openai_client.responses.create(
         model="gpt-4.1",
-        input=message
+        input=message,
+        instructions="You are a helpful assistant that can answer questions directly to the point and concisely.",
+        temperature=0.1,
+        max_output_tokens=150,
     )
     return response.output[0].content[0].text
 
@@ -88,8 +93,7 @@ def process_and_respond(recipient: str, message: str, whatsapp_number: str):
         # Send response via WhatsApp
         send_whatsapp_message(recipient, reply_message)
         
-        # Log outgoing message
-        logging.info(f"Outgoing - recipient={recipient}, sender={whatsapp_number}, message={reply_message}")
+        logging.info(f"OUTGOING - recipient={recipient}, sender={whatsapp_number}, message={reply_message}")
         
         # Save outgoing message to database
         # Create a new database session for the background task
@@ -138,8 +142,7 @@ async def chat(
         direction=MessageDirection.incoming
     )
     
-    # Log incoming message
-    logging.info(f"Incoming - recipient={recipient_number}, sender={sender_number}, message={Body}")
+    logging.info(f"INCOMING - recipient={recipient_number}, sender={sender_number}, message={Body}")
     
     # Add background task to process and respond
     background_tasks.add_task(
@@ -149,7 +152,6 @@ async def chat(
         whatsapp_number=whatsapp_number
     )
     
-    # Return immediate acknowledgment
     return {"status": "received", "message": "Message received and being processed"}
 
 
