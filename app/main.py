@@ -1,6 +1,6 @@
 import os
 import logging
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Form
+from fastapi import FastAPI, Depends, HTTPException, Form
 from twilio.rest import Client
 from openai import OpenAI
 from sqlalchemy.orm import Session
@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 
 from app.models.schemas import MessageHistory, User as UserSchema, UserUpdate
 from app.models.database import Message, MessageDirection, User
-from app.database import get_db, init_db, get_db_context
+from app.database import get_db, init_db
+from app.message_batcher import MessageBatcher
 
 load_dotenv()
 
@@ -35,8 +36,16 @@ whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on startup."""
+    """Initialize database tables and message batcher on startup."""
     init_db()
+    
+    # Initialize message batcher
+    app.state.message_batcher = MessageBatcher(
+        openai_client=openai_client,
+        twilio_client=twilio_client,
+        whatsapp_number=whatsapp_number
+    )
+    logging.info("Message batcher initialized")
 
 
 def validate_phone_number(phone: str) -> str:
@@ -150,34 +159,8 @@ def save_message(
     return db_message
 
 
-def process_and_respond(recipient: str, message: str, whatsapp_number: str, conversation_id: str, user_id: int):
-    """Background task to process message with ChatGPT and send response."""
-    try:
-        # Get ChatGPT response with conversation context
-        reply_message = get_chatgpt_reply(message, conversation_id)
-        
-        # Send response via WhatsApp
-        send_whatsapp_message(recipient, reply_message)
-        
-        logging.info(f"OUTGOING - recipient={recipient}, sender={whatsapp_number}, message={reply_message}")
-        
-        with get_db_context() as db:
-            save_message(
-                db=db,
-                recipient=recipient,
-                sender=whatsapp_number,
-                message_text=reply_message,
-                direction=MessageDirection.outgoing,
-                user_id=user_id
-            )
-            
-    except Exception as e:
-        logging.error(f"ERROR PROCESSING MESSAGE: {str(e)}")
-
-
 @app.post("/chat")
 async def chat(
-    background_tasks: BackgroundTasks,
     From: str = Form(...),
     Body: str = Form(...),
     To: str | None = Form(None),
@@ -185,9 +168,9 @@ async def chat(
     db: Session = Depends(get_db)
 ):
     """
-    Twilio webhook endpoint that receives WhatsApp messages,
-    processes them with ChatGPT, and sends responses back.
-    Returns immediately while processing happens in the background.
+    Twilio webhook endpoint that receives WhatsApp messages.
+    Messages are batched per user with a 10-second debounce timer.
+    Multiple messages within 10 seconds are combined and sent to ChatGPT as one request.
     Automatically creates users and conversations on first message.
     """
     try:
@@ -213,17 +196,15 @@ async def chat(
         
         logging.info(f"INCOMING - recipient={recipient_number}, sender={sender_number}, user_id={user.id}, message={Body}")
         
-        # Add background task to process and respond
-        background_tasks.add_task(
-            process_and_respond,
-            recipient=sender_number,
+        # Add message to the batcher (will wait 10 seconds with debounce)
+        await app.state.message_batcher.add_message(
+            user_id=user.id,
             message=Body,
-            whatsapp_number=whatsapp_number,
-            conversation_id=conversation_id,
-            user_id=user.id
+            phone_number=sender_number,
+            conversation_id=conversation_id
         )
         
-        return {"status": "received", "message": "Message received and being processed"}
+        return {"status": "received", "message": "Message received and queued for processing"}
         
     except ValueError as e:
         logging.error(f"Phone number validation error: {str(e)}")
