@@ -1,0 +1,203 @@
+{
+	"info": {
+		"_postman_id": "a228111c-b459-4a66-a771-9383007148fb",
+		"name": "FastAPI-Twilio",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43873976",
+		"_collection_link": "https://dasfasdfasd-4996113.postman.co/workspace/Personal-Workspace~e1722566-88c9-46d0-97e3-c643587eaed2/collection/43873976-a228111c-b459-4a66-a771-9383007148fb?action=share&source=collection_link&creator=43873976"
+	},
+	"item": [
+		{
+			"name": "health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8000/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Twilio Webhook Simulation",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "From",
+							"value": "whatsapp:{{twilio_whatsapp_number}}",
+							"type": "text"
+						},
+						{
+							"key": "To",
+							"value": "whatsapp:{{test_whatsapp_number}}",
+							"type": "text"
+						},
+						{
+							"key": "Body",
+							"value": "Hello, how are you?",
+							"type": "text"
+						},
+						{
+							"key": "MessageSid",
+							"value": "SM1234567890abcdef",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8000/chat",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"chat"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Users",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8000/users/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"users",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get User",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8000/users/{{test_whatsapp_number}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"users",
+						"{{test_whatsapp_number}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get User Conversation History",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8000/history/{{test_whatsapp_number}}?limit=20",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"history",
+						"{{test_whatsapp_number}}"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "20"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update User",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"first_name\": \"Juan\",\n    \"last_name\": \"Perez\",\n    \"address\": \"Mcal Lopez 1337\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8000/users/{{test_whatsapp_number}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"users",
+						"{{test_whatsapp_number}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "twilio_whatsapp_number",
+			"value": ""
+		},
+		{
+			"key": "test_whatsapp_number",
+			"value": ""
+		}
+	]
+}
