@@ -7,6 +7,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from app.models.database import User, MessageDirection
+
 # Load environment variables
 load_dotenv()
 
@@ -104,7 +106,7 @@ def get_or_create_user(db: Session, phone_number: str):
     return user
 
 
-def get_or_create_conversation(openai_client: OpenAI, user, db: Session) -> str:
+def get_or_create_conversation(openai_client: OpenAI, user: User, db: Session) -> str:
     """
     Get existing OpenAI conversation ID or create a new one for the user.
     """
@@ -126,7 +128,7 @@ def save_message(
     recipient: str,
     sender: str,
     message_text: str,
-    direction,
+    direction: MessageDirection,
     user_id: int = None
 ):
     """Save a message to the database."""
