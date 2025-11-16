@@ -7,12 +7,10 @@ from sqlalchemy.orm import sessionmaker, Session
 from openai import OpenAI
 from dotenv import load_dotenv
 
-from app.models.database import User, MessageDirection
+from app.models.database import User, Message, MessageDirection
 
-# Load environment variables
 load_dotenv()
 
-# Database URL from environment variable
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@postgres:5432/twilio_db"
@@ -90,8 +88,6 @@ def get_or_create_user(db: Session, phone_number: str):
     """
     Get existing user by phone number or create a new one.
     """
-    from app.models.database import User
-    
     user = db.query(User).filter(User.phone_number == phone_number).first()
     
     if user:
@@ -132,8 +128,6 @@ def save_message(
     user_id: int = None
 ):
     """Save a message to the database."""
-    from app.models.database import Message
-    
     db_message = Message(
         recipient=recipient,
         sender=sender,
@@ -145,4 +139,3 @@ def save_message(
     db.commit()
     db.refresh(db_message)
     return db_message
-

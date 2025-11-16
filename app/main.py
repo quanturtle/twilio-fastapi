@@ -52,7 +52,7 @@ async def startup_event():
         twilio_client=twilio_client,
         whatsapp_number=whatsapp_number
     )
-    logging.info("Message batcher initialized")
+    logging.debug("Message batcher initialized")
 
 
 @app.post("/chat")
