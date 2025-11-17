@@ -67,6 +67,21 @@ DATABASE_URL=postgresql://postgres:postgres@postgres:5432/twilio_db
 NGROK_AUTHTOKEN=your_ngrok_authtoken_here
 ```
 
+### Application Configuration
+
+The application includes additional configuration options in `app/config.py` that can be customized:
+
+#### OpenAI Settings
+- **`model`** (default: `"gpt-4.1-mini"`): The OpenAI model to use for chat completions
+- **`instructions`** (default: `"You are a helpful assistant that can answer questions directly to the point and concisely."`): System instructions for the AI assistant
+- **`temperature`** (default: `0.1`): Controls randomness in responses (0.0 = deterministic, 2.0 = very random)
+- **`max_output_tokens`** (default: `150`): Maximum number of tokens in the AI response
+
+#### Message Batching Settings
+- **`debounce_time`** (default: `0`): Time in seconds to wait before processing batched messages. Set to 0 to disable batching.
+
+These settings can be modified directly in `app/config.py`.
+
 ### Start All Services
 
 ```bash
