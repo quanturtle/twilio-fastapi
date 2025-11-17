@@ -1,37 +1,52 @@
 # FastAPI Twilio ChatGPT WhatsApp Bot
 
-A dockerized FastAPI application that receives WhatsApp messages via Twilio webhook, processes them with ChatGPT, sends responses back through the Twilio WhatsApp API, and stores conversation history in a PostgreSQL database.
+A dockerized FastAPI application that receives WhatsApp messages via Twilio, processes them with ChatGPT, and responds back through WhatsApp. All conversations are stored in PostgreSQL.
 
 ## Project Structure
 
 ```
 twilio-fastapi/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI application
-│   ├── database.py                # Database configuration
+│   ├── main.py              # FastAPI application
+│   ├── database.py          # Database configuration
+│   ├── message_batcher.py   # Message batching logic
+│   ├── utils.py             # Utility functions
 │   └── models/
-│       ├── __init__.py
-│       ├── schemas.py             # Pydantic models
-│       └── database.py            # SQLAlchemy models
-├── docker-compose.yml             # Docker services orchestration
-├── Dockerfile                     # FastAPI app container
-├── requirements.txt               # Python dependencies
-├── env.example                    # Environment variables template
+│       ├── schemas.py       # Pydantic models
+│       └── database.py      # SQLAlchemy models
+├── img/                     # Documentation images
+├── docker-compose.yml       # Docker orchestration
+├── Dockerfile
+├── requirements.txt
 └── README.md
 ```
 
+## Prerequisites
+
+### 1. Get Ngrok Auth Token
+
+Sign up at [ngrok.com](https://ngrok.com/) and get your auth token from the dashboard.
+
+![Ngrok Interface](img/ngrok.png)
+
+### 2. Set Up Twilio WhatsApp
+
+* Create a [Twilio account](https://www.twilio.com/try-twilio)
+* Go to your [Twilio Console](https://console.twilio.com/)
+
+![Twilio Console](img/twilio_console.png)
+
+### 3. Set up WhatsApp Sandbox
+
+![Twilio Sandbox Settings](img/twilio_sandbox_settings.png)
+
 ## Setup
 
-### 1. Configure Environment Variables
+### Configure Environment Variables
 
-Create a `.env` file in the project root using `env.example` as a template:
+Your public URL will look like: `https://xxxx-xx-xx-xxx-xxx.ngrok-free.app`
 
-```bash
-cp env.example .env
-```
-
-Edit `.env` with your credentials:
+Create a `.env` file in the project root with your credentials:
 
 ```
 # Twilio Configuration
@@ -52,41 +67,16 @@ DATABASE_URL=postgresql://postgres:postgres@postgres:5432/twilio_db
 NGROK_AUTHTOKEN=your_ngrok_authtoken_here
 ```
 
-### 2. Start All Services
-
-Start all services (FastAPI app, PostgreSQL, ngrok) with Docker Compose:
+### Start All Services
 
 ```bash
-docker-compose up -d
+docker compose up --build
 ```
 
-This will start:
-- **fastapi-app**: The main application on port 8000
-- **postgres**: PostgreSQL database on port 5432
-- **ngrok**: Tunnel service with web interface on port 4040
-
-### 3. Get Your Public URL
-
-Access the ngrok web interface to get your public URL:
-
-```bash
-open http://localhost:4040
-```
-
-Or check the logs:
-
-```bash
-docker-compose logs ngrok
-```
-
-Your public ngrok URL will look like: `https://xxxx-xx-xx-xxx-xxx.ngrok-free.app`
-
-### 4. Configure Twilio Webhook
-
-1. Log in to your [Twilio Console](https://console.twilio.com/)
-2. Navigate to your WhatsApp Sandbox settings or your approved WhatsApp number
-3. Set the webhook URL for incoming messages to: `https://your-ngrok-url.ngrok-free.app/chat`
-4. Make sure the HTTP method is set to `POST`
+This starts:
+- **fastapi-app**: Application on port 8000
+- **postgres**: Database on port 5432
+- **ngrok**: Tunnel with web interface on port 4040
 
 ## Managing the Application
 
@@ -94,97 +84,54 @@ Your public ngrok URL will look like: `https://xxxx-xx-xx-xxx-xxx.ngrok-free.app
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f fastapi-app
-docker-compose logs -f postgres
-docker-compose logs -f ngrok
+docker compose logs -f fastapi-app
+docker compose logs -f postgres
+docker compose logs -f ngrok
 ```
 
 ### Stop Services
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### Rebuild After Code Changes
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### Access Database
 
 ```bash
-docker-compose exec postgres psql -U postgres -d twilio_db
+docker compose exec postgres psql -U postgres -d twilio_db
 ```
 
 ## API Endpoints
 
 ### `POST /chat`
-Twilio webhook endpoint that receives WhatsApp messages, processes them with ChatGPT, and sends responses back via WhatsApp. All messages are saved to the database.
+Webhook endpoint for WhatsApp messages (receives Twilio form data). Processes with ChatGPT and responds via WhatsApp.
 
-**Example Request:**
 ```bash
 curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "recipient": "+595975123456",
-    "message": "What is the eighth month of the year?"
-  }'
-```
-
-**Response:**
-```json
-{
-    "recipient": "+595975123456",
-    "sender": "+14155238886",
-    "message": "The eighth month of the year is August."
-}
+  -d "From=whatsapp:+595975123456" \
+  -d "Body=Hello!" \
+  -d "To=whatsapp:+14155238886"
 ```
 
 ### `GET /history/{recipient}`
-Retrieve conversation history for a specific recipient phone number.
+Get conversation history for a phone number.
 
-**Example Request:**
 ```bash
 curl http://localhost:8000/history/+595975123456?limit=10
 ```
 
-**Response:**
-```json
-[
-    {
-        "id": 2,
-        "recipient": "+595975123456",
-        "sender": "+14155238886",
-        "message_text": "The eighth month of the year is August.",
-        "timestamp": "2025-11-14T10:30:00",
-        "direction": "outgoing"
-    },
-    {
-        "id": 1,
-        "recipient": "+14155238886",
-        "sender": "+595975123456",
-        "message_text": "What is the eighth month of the year?",
-        "timestamp": "2025-11-14T10:29:55",
-        "direction": "incoming"
-    }
-]
-```
-
 ### `GET /`
-Health check endpoint to verify the service is running.
+Health check endpoint.
 
-**Example Request:**
 ```bash
 curl http://localhost:8000/
 ```
-
-**Response:**
-```json
-{
-    "status": "ok",
-    "message": "Twilio FastAPI ChatGPT WhatsApp Bot"
-}
