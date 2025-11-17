@@ -119,7 +119,7 @@ Webhook endpoint for WhatsApp messages (receives Twilio form data). Processes wi
 curl -X POST http://localhost:8000/chat \
   -d "From=whatsapp:+595975123456" \
   -d "Body=Hello!" \
-  -d "To=whatsapp:+14155238886"
+  -d "To=whatsapp:+14155238999"
 ```
 
 ### `GET /history/{recipient}`
