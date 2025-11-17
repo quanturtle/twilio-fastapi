@@ -6,6 +6,7 @@ from twilio.rest import Client
 from app.database import get_db_context, save_message
 from app.utils import get_chatgpt_reply, send_whatsapp_message
 from app.models.database import MessageDirection
+from app.config import Settings
 
 
 class MessageBatcher:
@@ -15,12 +16,18 @@ class MessageBatcher:
     """
 
     def __init__(
-        self, openai_client: OpenAI, twilio_client: Client, whatsapp_number: str
+        self,
+        openai_client: OpenAI,
+        twilio_client: Client,
+        whatsapp_number: str,
+        settings: Settings,
     ):
         self.pending_batches: dict[int, dict] = {}
         self.openai_client = openai_client
         self.twilio_client = twilio_client
         self.whatsapp_number = whatsapp_number
+        self.settings = settings
+        self.debounce_time = settings.debounce_time
 
     async def add_message(
         self, user_id: int, message: str, phone_number: str, conversation_id: str
@@ -57,7 +64,7 @@ class MessageBatcher:
         Wait for 10 seconds, then process the batch of messages for the user.
         """
         try:
-            await asyncio.sleep(10)
+            await asyncio.sleep(self.debounce_time)
 
             # Get batch data
             batch_data = self.pending_batches.get(user_id)
@@ -102,7 +109,7 @@ class MessageBatcher:
         try:
             # Get ChatGPT response with conversation context
             reply_message = get_chatgpt_reply(
-                self.openai_client, combined_message, conversation_id
+                self.openai_client, combined_message, conversation_id, self.settings
             )
 
             # Send response via WhatsApp

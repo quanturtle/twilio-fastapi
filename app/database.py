@@ -2,11 +2,11 @@ import os
 import logging
 from contextlib import contextmanager
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from app.models.base import Base
 from app.models.database import User, Message, MessageDirection
 
 load_dotenv()
@@ -20,9 +20,6 @@ engine = create_engine(DATABASE_URL)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create Base class for models
-Base = declarative_base()
 
 
 def get_db():
@@ -88,6 +85,8 @@ def get_or_create_user(db: Session, phone_number: str):
     """
     Get existing user by phone number or create a new one.
     """
+    from app.models.database import User
+
     user = db.query(User).filter(User.phone_number == phone_number).first()
 
     if user:

@@ -1,16 +1,20 @@
 from openai import OpenAI
 from twilio.rest import Client
 
+from app.config import Settings
 
-def get_chatgpt_reply(openai_client: OpenAI, message: str, conversation_id: str) -> str:
+
+def get_chatgpt_reply(
+    openai_client: OpenAI, message: str, conversation_id: str, settings: Settings
+) -> str:
     """Get a reply from ChatGPT for the given message using conversation state."""
     response = openai_client.responses.create(
-        model="gpt-4.1",
+        model=settings.model,
         input=message,
         conversation=conversation_id,
-        instructions="You are a helpful assistant that can answer questions directly to the point and concisely.",
-        temperature=0.1,
-        max_output_tokens=150,
+        instructions=settings.instructions,
+        temperature=settings.temperature,
+        max_output_tokens=settings.max_output_tokens,
     )
     return response.output[0].content[0].text
 

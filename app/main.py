@@ -17,6 +17,7 @@ from app.database import (
     save_message,
 )
 from app.message_batcher import MessageBatcher
+from app.config import get_settings
 
 load_dotenv()
 
@@ -43,11 +44,15 @@ async def startup_event():
     """Initialize database tables and message batcher on startup."""
     init_db()
 
+    # Get settings instance
+    settings = get_settings()
+
     # Initialize message batcher
     app.state.message_batcher = MessageBatcher(
         openai_client=openai_client,
         twilio_client=twilio_client,
         whatsapp_number=whatsapp_number,
+        settings=settings,
     )
     logging.debug("Message batcher initialized")
 
