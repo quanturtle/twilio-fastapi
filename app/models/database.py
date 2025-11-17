@@ -20,8 +20,15 @@ class User(Base):
     last_name = Column(String, nullable=True)
     address = Column(String, nullable=True)
     openai_conversation_id = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
     # Relationship to messages
     messages = relationship("Message", back_populates="user")
@@ -37,7 +44,9 @@ class Message(Base):
     recipient = Column(String, index=True, nullable=False)
     sender = Column(String, nullable=False)
     message_text = Column(String, nullable=False)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    timestamp = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     direction = Column(Enum(MessageDirection), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -46,4 +55,3 @@ class Message(Base):
 
     def __repr__(self):
         return f"<Message(id={self.id}, recipient={self.recipient}, direction={self.direction})>"
-

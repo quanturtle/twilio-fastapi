@@ -14,7 +14,7 @@ from app.database import (
     validate_phone_number,
     get_or_create_user,
     get_or_create_conversation,
-    save_message
+    save_message,
 )
 from app.message_batcher import MessageBatcher
 
@@ -22,21 +22,18 @@ load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(levelname)s:     %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(levelname)s:     %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-logging.getLogger('openai').setLevel(logging.WARNING)
-logging.getLogger('httpx').setLevel(logging.WARNING)
-logging.getLogger('httpcore').setLevel(logging.WARNING)
-logging.getLogger('twilio').setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("twilio").setLevel(logging.WARNING)
 
 app = FastAPI(title="Twilio FastAPI ChatGPT WhatsApp Bot")
 
-twilio_client = Client(
-    os.getenv("TWILIO_ACCOUNT_SID"),
-    os.getenv("TWILIO_AUTH_TOKEN")
-)
+twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
 
@@ -45,12 +42,12 @@ whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
 async def startup_event():
     """Initialize database tables and message batcher on startup."""
     init_db()
-    
+
     # Initialize message batcher
     app.state.message_batcher = MessageBatcher(
         openai_client=openai_client,
         twilio_client=twilio_client,
-        whatsapp_number=whatsapp_number
+        whatsapp_number=whatsapp_number,
     )
     logging.debug("Message batcher initialized")
 
@@ -61,7 +58,7 @@ async def chat(
     Body: str = Form(...),
     To: str | None = Form(None),
     MessageSid: str | None = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Twilio webhook endpoint that receives WhatsApp messages.
@@ -73,13 +70,13 @@ async def chat(
         # Validate and normalize phone numbers
         sender_number = validate_phone_number(From)
         recipient_number = validate_phone_number(To) if To else whatsapp_number
-        
+
         # Get or create user for sender
         user = get_or_create_user(db, sender_number)
-        
+
         # Get or create OpenAI conversation for this user
         conversation_id = get_or_create_conversation(openai_client, user, db)
-        
+
         # Save incoming message to database with user association
         save_message(
             db=db,
@@ -87,21 +84,26 @@ async def chat(
             sender=sender_number,
             message_text=Body,
             direction=MessageDirection.incoming,
-            user_id=user.id
+            user_id=user.id,
         )
-        
-        logging.info(f"INCOMING - recipient={recipient_number}, sender={sender_number}, user_id={user.id}, message={Body}")
-        
+
+        logging.info(
+            f"INCOMING - recipient={recipient_number}, sender={sender_number}, user_id={user.id}, message={Body}"
+        )
+
         # Add message to the batcher (will wait 10 seconds with debounce)
         await app.state.message_batcher.add_message(
             user_id=user.id,
             message=Body,
             phone_number=sender_number,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
         )
-        
-        return {"status": "received", "message": "Message received and queued for processing"}
-        
+
+        return {
+            "status": "received",
+            "message": "Message received and queued for processing",
+        }
+
     except ValueError as e:
         logging.error(f"Phone number validation error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -115,21 +117,19 @@ async def get_user(phone_number: str, db: Session = Depends(get_db)):
     try:
         validated_phone = validate_phone_number(phone_number)
         user = db.query(User).filter(User.phone_number == validated_phone).first()
-        
+
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         return user
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.put("/users/{phone_number}", response_model=UserSchema)
 async def update_user(
-    phone_number: str,
-    user_update: UserUpdate,
-    db: Session = Depends(get_db)
+    phone_number: str, user_update: UserUpdate, db: Session = Depends(get_db)
 ):
     """
     Update user information (first_name, last_name, address).
@@ -137,13 +137,13 @@ async def update_user(
     try:
         # Validate phone number format
         validated_phone = validate_phone_number(phone_number)
-        
+
         # Find user
         user = db.query(User).filter(User.phone_number == validated_phone).first()
-        
+
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         # Update fields if provided
         if user_update.first_name is not None:
             user.first_name = user_update.first_name
@@ -151,13 +151,13 @@ async def update_user(
             user.last_name = user_update.last_name
         if user_update.address is not None:
             user.address = user_update.address
-        
+
         db.commit()
         db.refresh(user)
-        
+
         logging.info(f"Updated user {validated_phone}")
         return user
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -172,25 +172,33 @@ async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 
 
 @app.get("/history/{phone_number}", response_model=list[MessageHistory])
-async def get_history(phone_number: str, limit: int = 50, db: Session = Depends(get_db)):
+async def get_history(
+    phone_number: str, limit: int = 50, db: Session = Depends(get_db)
+):
     """
     Retrieve conversation history for a specific user by phone number.
     """
     try:
         validated_phone = validate_phone_number(phone_number)
         user = db.query(User).filter(User.phone_number == validated_phone).first()
-        
+
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         # Get messages for this user
-        messages = db.query(Message).filter(
-            Message.user_id == user.id
-        ).order_by(Message.timestamp.desc()).limit(limit).all()
-        
+        messages = (
+            db.query(Message)
+            .filter(Message.user_id == user.id)
+            .order_by(Message.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
         if not messages:
-            raise HTTPException(status_code=404, detail="No messages found for this user")
-        
+            raise HTTPException(
+                status_code=404, detail="No messages found for this user"
+            )
+
         return [
             MessageHistory(
                 id=msg.id,
@@ -199,11 +207,11 @@ async def get_history(phone_number: str, limit: int = 50, db: Session = Depends(
                 message_text=msg.message_text,
                 timestamp=msg.timestamp.isoformat(),
                 direction=msg.direction.value,
-                user_id=msg.user_id
+                user_id=msg.user_id,
             )
             for msg in messages
         ]
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -212,4 +220,3 @@ async def get_history(phone_number: str, limit: int = 50, db: Session = Depends(
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "message": "Twilio FastAPI ChatGPT WhatsApp Bot"}
-

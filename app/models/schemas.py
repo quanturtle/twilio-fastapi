@@ -17,7 +17,9 @@ class MessageHistory(BaseModel):
 
 
 class UserCreate(BaseModel):
-    phone_number: str = Field(..., description="Phone number with country code (e.g., +595XXXXXXXXX)")
+    phone_number: str = Field(
+        ..., description="Phone number with country code (e.g., +595XXXXXXXXX)"
+    )
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     address: Optional[str] = None
@@ -41,4 +43,3 @@ class User(BaseModel):
 
     class Config:
         from_attributes = True
-
